@@ -17,6 +17,7 @@ void load_parentlock(struct mux_parentlock *parlock, struct mux_device *device) 
         fprintf(stderr, "Error: Could not load parentlock file: %s\n", parlock_file);
         exit(1);
     }
+    fprintf(stdout, "Loading parentlock file from: %s\n", parlock_file);
 
     strncpy(parlock->CODE.UNLOCK, get_ini_string(muos_pass, "code", "unlock", "0000"),
             MAX_BUFFER_SIZE - 1);
