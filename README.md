@@ -1,61 +1,41 @@
-# muOS Frontend
+# Parent lock software
 
-This is where all the magic of the user interface of MustardOS (muOS) comes to life:
+This repository contains a parental control software for MuOS.
+This application is made to set up and limit device usage time.
+The configuration and usage are described below.
 
-### Dependency
+## Configuration
 
-* `common`: Common Libraries and Functions
-* `font`: Common binary compiled fonts with individual language support
-* `lookup`: Friendly name lookup table mainly for arcade content
-* `lvgl`: [LVGL Embedded Graphics Library](https://github.com/lvgl/lvgl)
+The parent lock application is using a configuration file found in `/mnt/mmc/MUOS/info/parent_lock.ini`
+This configuration file looks like this:
 
-### Independent
+```
+[code]
+unlock=0000
 
-* `mufbset`: Customised framebuffer resolution switcher
-* `muhotkey`: Global Hotkey System
-* `muterm`: Custom Terminal Emulator
-* `muxcharge`: Charging Information Screen
-* `muxcredits`: Supporter Credits Screen
-* `muxfrontend`: Main Frontend Specific Runner
-* `muxstart`: Information and Progress Screen
-* `muxwarn`: First Install Disclaimer Message
+[message]
+unlock=Time is up
+setting=
 
-### Modules
+[times]
+monday=0
+tuesday=0
+wednesday=0
+thursday=0
+friday=0
+saturday=0
+sunday=0
+```
 
-* `muxapp`: Application List
-* `muxarchive`: Archive Manager
-* `muxassign`: Assignable System/Core for Content
-* `muxcollect`: Content Collection Manager
-* `muxconfig`: Configuration Menu
-* `muxconnect`: Connectivity Menu
-* `muxcustom`: Customisation Menu
-* `muxgov`: System Governor Selector
-* `muxhdmi`: HDMI Configuration
-* `muxhistory`: Content History Menu
-* `muxinfo`: Information Menu
-* `muxlanguage`: Language Selector
-* `muxlaunch`: Main Menu
-* `muxnetprofile`: Network Profile Manager
-* `muxnetscan`: Network SSID Scanner
-* `muxnetwork`: Network Configuration
-* `muxoption`: Content Explorer Options
-* `muxpass`: Passcode Screen
-* `muxpicker`: Customisation Package Selector
-* `muxplore`: Content Explorer
-* `muxpower`: Power Settings
-* `muxrtc`: Date and Time
-* `muxsearch`: Content Search
-* `muxshare`: Shared Frontend Variables
-* `muxshot`: Screenshot Viewer
-* `muxspace`: Disk Usage Information
-* `muxsplash`: Simple PNG Based Splash Screen
-* `muxstorage`: Storage Migrate/Sync Information
-* `muxsysinfo`: System Information
-* `muxtag`: Content Tag Manager
-* `muxtask`: Task Toolkit
-* `muxtester`: Input Tester
-* `muxtimezone`: Timezone Selector
-* `muxtweakadv`: Advanced Settings
-* `muxtweakgen`: General Settings
-* `muxvisual`: Interface Options
-* `muxwebserv`: Web Services
+The `unlock` key in the `code` section defines the code to enter to unlock the device. Using `0000` disables the parent lock.
+When the time is up for a given day, a lock screen will be displayed where it's possible to either cancel the locking (by entering the unlock code) and pressing `A` or shutting the device off (by pressing `B`)
+
+The `unlock` key in the `message` section defines the title of the unlock screen.
+The **days** keys in the `times` section contains the allowance, in minutes, for each day. Using `0` or anything above `1440` disable the locking mechanism for this day.
+
+## Usage
+
+When using the parental lock feature, it's mainly passive. Once the time is up, a lock screen is shown where you can enter the code you've set up to unlock or shutdown the device by pressing 'B' or 'Power' button.
+
+It might be interesting to set up a "Settings" passcode too (see muxpass documentation at https://muos.dev/installation/passcode to learn how to do that) so it's not possible for your kids to change the configuration of the device. You'll need to enable "Custom init script" option in the settings for the application to load on boot. Don't allow your kids to run a terminal and don't allow them to delete files on the device (I'm not telling you which files are important, so they can't know for sure and it'll likely damage the console)
+
