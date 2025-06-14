@@ -911,3 +911,5 @@ void mux_input_stop(void) {
     pthread_join(joystick_thread, NULL);
     pthread_join(keyboard_thread, NULL);
 }
+
+void mux_signal_stop(void) { stop = true; }

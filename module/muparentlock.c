@@ -32,19 +32,55 @@ char nv_counter_file[MAX_BUFFER_SIZE] = {};
 volatile int 	exit_required = 0;
 int       		timetracker_running = 0; 
 const char *    p_code = NULL;
+int 			copy_required = 0;
 
+// This is signal safe copy file method that works across file system, unlike rename
+int copy_file(const char * old, const char * new)
+{
+	int source = open(old, O_RDONLY, 0);
+    int dest = open(new, O_WRONLY | O_CREAT /*| O_TRUNC*/, 0644);
+	if (source == -1 || dest == -1) return -1;
+
+	char buf[256] = {};
+	size_t size = 0;
+    while ((size = read(source, buf, sizeof(buf))) > 0)
+        write(dest, buf, size);
+
+    close(source);
+    close(dest);
+
+	return size;
+}
+extern void mux_signal_stop(void);
 void sighandler(int signumber)
 {
 	if (signumber == SIGTERM || signumber == SIGINT)
 	{
 		// Need to copy the temporal file to non-volatile storage now, rename is a safe call from signal handler
-		rename(MUX_PARENTLOCK_TRACKING, nv_counter_file); 
+		if (copy_required) {
+			int ret = copy_file(MUX_PARENTLOCK_TRACKING, nv_counter_file); 
+			if (ret == -1) write(1, "Failed\n", sizeof("Failed\n") - 1);
+			else {
+				write(1, "Copied ", sizeof("Moved ") - 1);
+				write(1, MUX_PARENTLOCK_TRACKING, sizeof(MUX_PARENTLOCK_TRACKING) - 1);
+				write(1, " to ", sizeof(" to ") - 1);
+				write(1, nv_counter_file, strlen(nv_counter_file));
+				write(1, "\n", 1);
+			}
+		}
+
 		exit_required = 1;
+		mux_signal_stop(); // Calling mux_input_stop here isn't safe since it tries to join threads, but mux_signal_stop is (or should be)
 	}
 	if (signumber == SIGINT)
 	{
-		write(1, "Exiting\n", sizeof("Exiting\n")-1);
+		write(1, "Exiting\n", sizeof("Exiting\n") - 1);
 	}
+}
+
+void shutdown_now()
+{
+	system("/opt/muos/script/mux/quit.sh poweroff frontend");
 }
 
 #define UI_COUNT 4
@@ -89,11 +125,19 @@ static void handle_confirm(void) {
 static void handle_back(void) {
     play_sound(SND_BACK, 0);
 
-	load_mux("shutdown");
+	
     exit_status_muxparentlock = 2;
     close_input();
     mux_input_stop();
 }
+
+static void handle_shutdown(void) {
+
+    exit_status_muxparentlock = 2;
+    close_input();
+    mux_input_stop();
+}
+	
 
 static void handle_up(void) {
     play_sound(SND_NAVIGATE, 0);
@@ -255,6 +299,7 @@ int muparentlock_main() {
                     [MUX_INPUT_DPAD_DOWN] = handle_down,
                     [MUX_INPUT_DPAD_LEFT] = handle_left,
                     [MUX_INPUT_DPAD_RIGHT] = handle_right,
+					[MUX_INPUT_POWER_SHORT] = handle_shutdown,
             },
             .hold_handler = {
                     [MUX_INPUT_DPAD_UP] = handle_up,
@@ -515,6 +560,8 @@ int overlay_framebuffer(const char * overlay_filename, const int pos_x, const in
 // thus, the main thread should be stopped to prevent dual control of the screen and input
 static int triggerLock()
 {
+	// Upon boot, the screen is fighting for who wants to draw on it, so let's allow the other application perform its work first before stopping it
+	sleep(5); 
 	pid_t child_pid = kill_users_of(device.SCREEN.DEVICE, SIGSTOP);
 
 	// Find user of /dev/fb0 so we can pause it
@@ -552,10 +599,12 @@ static int triggerLock()
 			kill_users_of(device.SCREEN.DEVICE, SIGCONT);
 		    return 0;
 		} else if (ret == 2) {
-			// We can kill the child pid anyway so the launcher will restart the frontend to shutdown
+			LOG_INFO("muparentlock", "Shutting down now")
 			kill_users_of(device.SCREEN.DEVICE, SIGTERM);
-			sleep(5);
+			sleep(2);
 			kill_users_of(device.SCREEN.DEVICE, SIGKILL);
+			memset(fb.mem, 0, fb.size);
+			shutdown_now();
 			return 0;
 		}
 	}
@@ -567,7 +616,7 @@ static int triggerLock()
 void muxparentlock_savetracker(void)
 {
 	if (file_exist(MUX_PARENTLOCK_TRACKING)) {
-		rename(MUX_PARENTLOCK_TRACKING, nv_counter_file);
+		copy_file(MUX_PARENTLOCK_TRACKING, nv_counter_file);
 		sync();
 	}
 }
@@ -612,8 +661,11 @@ static int process(void)
 	if (!localtime_r(&now, &current)) return triggerLock();
 
     if (file_exist(counter_file)) {
+		
 		struct tm previous;
 		char * prev_run = read_line_char_from(counter_file, 1);
+
+		LOG_INFO("muparentlock", "Loading time tracker from %s: %s", counter_file, prev_run)
 		if (sscanf(prev_run, "%ld %u", &lastBoot, &additionalTime) != 2) { free(prev_run); return triggerLock(); }
 		free(prev_run);
 
@@ -623,9 +675,11 @@ static int process(void)
 		if (previous.tm_wday != current.tm_wday || previous.tm_mday != current.tm_mday || previous.tm_mon != current.tm_mon) {
 			// Gremlins isn't cheating, let's clear the additional time
 			additionalTime = 0;
-		} 
-		remove(counter_file);
-	}		
+		}
+		copy_required = 0;
+	}
+
+	lastBoot = now;
 
 	// Read configuration now to know what's the maximum allowed time for today
 	load_parentlock(&parentlock, &device);
@@ -682,6 +736,9 @@ static int process(void)
 
 	LOG_DEBUG("muparentlock", "Parent lock process created, maxTimeForToday %u/addtime %u", maxTimeForToday, additionalTime)
 
+	// If we've already spent all time, let's lock too
+	if (additionalTime >= maxTimeForToday) return triggerLock();
+
 	// Main process is dumb here, we are sleeping for 1mn and take the time, 
 	// and write it to the counter or trigger the parental lock
 	while (!exit_required)
@@ -698,9 +755,10 @@ static int process(void)
 		if (!file) return triggerLock();
 		fprintf(file, "%ld %u\n", lastBoot, elapsed);
 		fclose(file);
+		copy_required = 1;
 
 		if (elapsed >= maxTimeForToday) return triggerLock();
-		else if (elapsed >= fiveMinBefore) { warn5mnLeft(); fiveMinBefore = 86400; }
+		else if (elapsed >= fiveMinBefore && elapsed <= fiveMinBefore + 60) { warn5mnLeft(); fiveMinBefore = 86400; }
 	}
 	return 0;
 }
@@ -1025,6 +1083,7 @@ int main(int argc, const char * argv[])
 		perror("Cannot create counter file path");
 		return 1;
 	}
+	LOG_DEBUG("muparentlock", "counter file is expected at %s", nv_counter_file);
 
 	if (file_exist(MUX_PARENTAUTH)) 
 	{	// The code was entered, so let's prevent showing the lock screen again 

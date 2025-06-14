@@ -26,11 +26,18 @@ SRCS = $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)/*.c))
 
 LIB_DIR = ${shell pwd}/../bin/lib
 LIB_FILES = $(patsubst %.c,$(LIB_DIR)/lib%.so,$(notdir $(SRCS)))
+LIB_FILES_STATIC = $(patsubst %.c,$(LIB_DIR)/lib%.a,$(notdir $(SRCS)))
 
-all: $(LIB_FILES)
+all: $(LIB_FILES) $(LIB_FILES_STATIC)
 
 $(LIB_DIR)/lib%.so: $(SRC_DIRS)/%.c
 	@printf "Compiling %s into %s...\n" "$<" "$@"
 	@mkdir -p $(LIB_DIR)
 	@$(CC) $< $(LDFLAGS) -o $@
+
+$(LIB_DIR)/lib%.a: $(SRC_DIRS)/%.c
+	@printf "Compiling %s into %s...\n" "$<" "$(patsubst %.c,%.o,$<)"
+	@mkdir -p $(LIB_DIR)
+	@$(CC) -c $< -o $(patsubst %.c,%.o,$<)
+	@$(CROSS_COMPILE)gcc-ar rcs $@ $(patsubst %.c,%.o,$<)
 	@find ${shell pwd} -name "*.o" -exec rm -f {} +

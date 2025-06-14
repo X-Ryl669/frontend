@@ -1,0 +1,10 @@
+# List of files in archive
+
+| File            | Installation path                      |
+|-----------------|----------------------------------------|
+| muparentlock    | /mnt/mmc/MUOS/application/ParentLock/  |
+| parent_lock.ini | /mnt/mmc/MUOS/info/                    |
+| 5mnLeft.png     | /opt/muos/share/overlay/standard/      |
+| install.md      | /mnt/mmc/MUOS/application/ParentLock/  |
+| plock.sh        | /run/muos/storage/init/                |
+

@@ -25,9 +25,18 @@ LDFLAGS = $(MUXLIB) -L../bin/lib -lui -llookup -lmux \
           -lnotosans_jp_medium -lnotosans_kr_medium -lnotosans_ar_medium \
           -lSDL2 -lSDL2_mixer -Wl,--gc-sections -s -Wl,-rpath,'./lib'
 
+LDFLAGS_STATIC = $(MUXLIB) -L../bin/lib -Wl,-Bstatic -lui -llookup -lmux \
+          -lnotosans_medium \
+          -Wl,-Bdynamic -lSDL2 -lSDL2_mixer -Wl,--gc-sections -s -Wl,-rpath,'./lib'
+
 EXTRA = $(LDFLAGS) -fno-exceptions -fno-stack-protector -fomit-frame-pointer \
 	-fno-unroll-loops -fmerge-all-constants -fno-ident \
 	-ffast-math -funroll-loops -falign-functions
+
+EXTRA_STATIC = $(LDFLAGS_STATIC) -fno-exceptions -fno-stack-protector -fomit-frame-pointer \
+	-fno-unroll-loops -fmerge-all-constants -fno-ident \
+	-ffast-math -funroll-loops -falign-functions
+
 
 MODULES = muxapp muxarchive muxassign muxcollect muxconfig muxconnect \
           muxcustom muxgov muxhdmi muxhistory muxinfo muxlanguage \
@@ -53,6 +62,7 @@ $(LIB_DIR)/$(LIB_FILE): $(OBJS)
 	@printf "Linking objects into %s\n" "$@"
 	@mkdir -p $(LIB_DIR)
 	@$(CC) $(OBJS) $(EXTRA) -shared -o $@
+	@$(CROSS_COMPILE)gcc-ar rcs -o $(LIB_DIR)/$(LIB_FILE:.so=.a) $(OBJS)
 
 	@find ${shell pwd} -name "*.o" -exec rm -f {} +
 

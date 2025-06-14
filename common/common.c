@@ -1380,6 +1380,7 @@ lv_font_t *get_language_font() {
     int font_size = get_font_size();
     size_t cache_size = 1024 * 10;
     lv_font_t *font;
+#ifndef STATIC_BUILD
     if (strcasecmp(config.SETTINGS.GENERAL.LANGUAGE, "Chinese (Simplified)") == 0) {
         font = lv_tiny_ttf_create_data_ex(&notosans_sc_medium_ttf, notosans_medium_ttf_len, font_size, cache_size);
     } else if (strcasecmp(config.SETTINGS.GENERAL.LANGUAGE, "Chinese (Traditional)") == 0) {
@@ -1393,6 +1394,9 @@ lv_font_t *get_language_font() {
     } else {
         font = lv_tiny_ttf_create_data_ex(&notosans_medium_ttf, notosans_medium_ttf_len, font_size, cache_size);
     }
+#else
+    font = lv_tiny_ttf_create_data_ex(&notosans_medium_ttf, notosans_medium_ttf_len, font_size, cache_size);
+#endif
     return font;
 }
 

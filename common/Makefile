@@ -26,14 +26,23 @@ SRCS = $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)/*.c))
 OBJS = $(SRCS:.c=.o)
 LIB_DIR = ${shell pwd}/../bin/lib
 LIB_FILE = libmux.so
+LIB_FILE_STATIC = libmux.a
 
-all: $(LIB_DIR)/$(LIB_FILE)
+all: $(LIB_DIR)/$(LIB_FILE) $(LIB_DIR)/$(LIB_FILE_STATIC)
 
 $(LIB_DIR)/$(LIB_FILE): $(OBJS)
 	@printf "Linking objects into %s\n" "$@"
 	@mkdir -p $(LIB_DIR)
 	@$(CC) $(OBJS) $(EXTRA) -shared -o $@
+
+$(LIB_DIR)/$(LIB_FILE_STATIC): $(OBJS)
+	@printf "Linking objects into %s\n" "$@"
+	@mkdir -p $(LIB_DIR)
+	@printf "Compiling common.c (static) into common.o\n" 
+	@$(CC) -c common.c -o common.o $(CFLAGS) -DSTATIC_BUILD
+	@$(CROSS_COMPILE)gcc-ar rcs $@ $(OBJS)
 	@find ${shell pwd} -name "*.o" -exec rm -f {} +
+
 
 %.o: %.c
 	@printf "Compiling %s into %s\n" "$<" "$@"

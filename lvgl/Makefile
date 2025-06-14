@@ -40,8 +40,9 @@ OBJS 			= $(AOBJS) $(COBJS)
 TARGET 			= $(addprefix $(BUILD_OBJ_DIR)/, $(patsubst ./%, %, $(OBJS)))
 
 LIBRARY         = $(BUILD_BIN_DIR)/libui.so
+LIBRARY_STATIC  = $(BUILD_BIN_DIR)/libui.a
 
-all: $(LIBRARY)
+all: $(LIBRARY) $(LIBRARY_STATIC)
 
 $(BUILD_OBJ_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -57,4 +58,9 @@ $(LIBRARY): $(TARGET)
 	@mkdir -p $(dir $(LIBRARY))
 	$(CC) -shared -o $@ $(TARGET) $(EXTRA)
 	@echo "Built shared library: $@"
+
+$(LIBRARY_STATIC): $(TARGET)
+	@mkdir -p $(dir $(LIBRARY))
+	$(CROSS_COMPILE)gcc-ar rcs $@ $(TARGET)
+	@echo "Built static library: $@"
 	@rm -rf $(BUILD_DIR)
